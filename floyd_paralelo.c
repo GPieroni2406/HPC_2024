@@ -2,11 +2,6 @@
 #define CHUNK_SIZE 2
 //#define numHilos 4
 
-// Declaraciones de las funciones utilizadas en el programa.
-void mostrarMatrizDeDistancias(int **matrizDistancias, int cantidadVertices,int numHilos);
-int **leerGrafoDesdeArchivo(const char *nombreArchivo, int *cantidadVertices);
-void algoritmoFloydWarshallParalelo(int **grafo, int cantidadVertices,int numHilos);
-
 // Función para leer la matriz de adyacencia de un grafo desde un archivo.
 int **leerGrafoDesdeArchivo(const char *nombreArchivo, int *cantidadVertices) {
     // Intenta abrir el archivo de entrada.

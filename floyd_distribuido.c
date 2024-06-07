@@ -8,13 +8,6 @@
 #define TAMANO_BLOQUE 2 // Tamaño de bloque para la programación dinámica de OpenMP.
 //#define numHilos 4 // Número de hilos para OpenMP.
 
-// Prototipos de funciones
-int **crear_matriz_contigua(int cantidad_vertices);
-int **llenar_matriz(int *cantidad_vertices);
-void mostrar_matriz(int **distancias, int cantidad_vertices);
-void liberar_recursos(int **distancias, int cantidad_vertices);
-void abortar_con_error(int codigo_error);
-
 // Función para crear una matriz de adyacencia contigua en memoria.
 int **crear_matriz_contigua(int cantidad_vertices) {
     int *datos = (int *)malloc(cantidad_vertices * cantidad_vertices * sizeof(int));
@@ -142,7 +135,7 @@ int main(int argc, char **argv) {
 
     omp_set_num_threads(numHilos);
     for (int k = 0; k < cantidad_vertices; k++) {
-        #pragma omp parallel for schedule(static, cantVertices/cantHilos) collapse(2)
+        #pragma omp parallel for schedule(static, cantidad_vertices/numHilos) collapse(2)
         for (int i = inicio; i < fin; i++) {
             for (int j = 0; j < cantidad_vertices; j++) {
                 if (distancias[i][k] == INF || distancias[k][j] == INF) continue;
@@ -152,9 +145,8 @@ int main(int argc, char **argv) {
                 }
             }
         }
+        MPI_Allreduce(MPI_IN_PLACE, *distancias, cantidad_vertices * cantidad_vertices, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
     }
-    MPI_Allreduce(MPI_IN_PLACE, *distancias, cantidad_vertices * cantidad_vertices, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-    
 
     if (rango == 0) {
         tiempo_final = MPI_Wtime();

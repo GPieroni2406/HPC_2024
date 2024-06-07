@@ -1,9 +1,5 @@
 #include "floyd_secuencial.h"
 
-// Prototipos de las funciones
-void mostrarMatrizDeDistancias(int **matrizDistancias, int cantidadVertices);
-void algoritmoFloydWarshall(int **grafo, int cantidadVertices);
-
 // Función para implementar el algoritmo de Floyd-Warshall. Cargo una matriz de distancias a partir del grafo de entradac que luego se ira actualizando.
 void algoritmoFloydWarshall(int **grafo, int cantidadVertices) {
     int **matrizDistancias = (int **)malloc(cantidadVertices * sizeof(int *)); //asignar dinámicamente la cantidad de memoria necesaria basada en V.
