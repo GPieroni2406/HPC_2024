@@ -1,4 +1,4 @@
-NP=${1:-4} # PROCESOS - POR DEFECTO 4
+P=${1:-4} # PROCESOS - POR DEFECTO 4
 H=${2:-1} # HILOS - POR DEFECTO 1
 
 # Se ejecuta mpirun con el valor de NP

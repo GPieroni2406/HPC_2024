@@ -33,7 +33,7 @@ int readVerticesCount(FILE* file) {
     return vertices;
 }
 
-void readMatrixFromFile(const char* filename, int* rows, int*** matrix) {
+int** readMatrixFromFile(const char* filename, int* rows) {
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
         perror("Error al abrir el archivo");
@@ -47,29 +47,16 @@ void readMatrixFromFile(const char* filename, int* rows, int*** matrix) {
         exit(EXIT_FAILURE);
     }
 
-    // Asigna memoria para la matriz de adyacencia con la cantidad de vértices leída
-    *matrix = (int**)malloc(*rows * sizeof(int*));
+    int ** matrix = (int **)malloc(*rows * sizeof(int *));
     for (int i = 0; i < *rows; i++) {
-        (*matrix)[i] = (int*)malloc(*rows * sizeof(int));
-    }
-
-    // Llena la matriz con los datos del archivo
-    for (int i = 0; i < *rows; i++) {
+        matrix[i] = (int *)malloc(*rows * sizeof(int));
         for (int j = 0; j < *rows; j++) {
-            if (fscanf(file, "%d", &(*matrix)[i][j]) != 1) {
-                perror("Error al leer el archivo");
-                // Libera la memoria asignada en caso de error
-                for (int k = 0; k <= i; k++) {
-                    free((*matrix)[k]);
-                }
-                free(*matrix);
-                fclose(file);
-                exit(EXIT_FAILURE);
-            }
+            // Lee la matriz de adyacencia del grafo desde el archivo.
+            fscanf(file, "%d", &matrix[i][j]);
         }
     }
-
     fclose(file);
+    return matrix;
 }
 
 // Esta función devuelve el mínimo de 2 números
@@ -110,24 +97,20 @@ int main(int argc, char **argv) {
 
     if (rank == 0) { // Inicio del código del proceso maestro
         // Proceso para dividir la gran matriz en fragmentos tipo grid
-        int** originalArray_W0; // Inicializando la matriz original
-
-        // Lee la matriz desde el archivo, que ahora también lee la cantidad de vértices
-        readMatrixFromFile("input.txt", &rows, &originalArray_W0);
-
-        int size_of_grid_chunk = rows / (sqrt((int)size)); // g = n / sqrt(p)
+        int** matriz_original = readMatrixFromFile("input.txt", &rows); ; // Inicializando la matriz original
+        int tamanio_submatriz = rows / (sqrt((int)size)); // g = n / sqrt(p)
 
         int counter = 0;
         int i = 0;
         int j = 0;
         int k = 0;
-        int g = size_of_grid_chunk; // g es el tamaño del fragmento tipo grid
+        int g = tamanio_submatriz; // g es el tamaño del fragmento tipo grid
 
         // Enviando los fragmentos de la matriz (grids) a los procesos esclavos
         for (i = 0; i < g; i++) {
             for (j = 0; j < g; j++) {
                 for (k = 0; k < g; k++) {
-                    MPI_Send(&originalArray_W0[(i * g) + k][j * g], g, MPI_INT, counter, k, MPI_COMM_WORLD);
+                    MPI_Send(&matriz_original[(i * g) + k][j * g], g, MPI_INT, counter, k, MPI_COMM_WORLD);
                 } // Fin del bucle k
                 counter = counter + 1;
             } // Fin del bucle j
@@ -148,7 +131,7 @@ int main(int argc, char **argv) {
             for (i = 0; i < size; i++) {
                 int i_by_g = i / g;
                 for (j = i_by_g * g; j < (i_by_g * g) + g; j++) {
-                    MPI_Send(&originalArray_W0[j][0], rows, MPI_INT, i, (j - (i_by_g * g)), MPI_COMM_WORLD); // Esto se ejecutará g veces para cada proceso
+                    MPI_Send(&matriz_original[j][0], rows, MPI_INT, i, (j - (i_by_g * g)), MPI_COMM_WORLD); // Esto se ejecutará g veces para cada proceso
                 } // Fin del bucle j
             } // Fin del bucle i
 
@@ -161,7 +144,7 @@ int main(int argc, char **argv) {
 
             // Enviando la fila k
             for (i = 0; i < size; i++) {
-                MPI_Send(&originalArray_W0[k][0], rows, MPI_INT, i, k, MPI_COMM_WORLD); // la etiqueta es k
+                MPI_Send(&matriz_original[k][0], rows, MPI_INT, i, k, MPI_COMM_WORLD); // la etiqueta es k
             }
             // Recibiendo la fila k
             int k_row[rows];
@@ -188,7 +171,7 @@ int main(int argc, char **argv) {
                 int start_j = (i % g) * g;
                 for (j = start_i; j < start_i + g; j++) {
                     MPI_Status status;
-                    MPI_Recv(&originalArray_W0[j][start_j], g, MPI_INT, i, (start_i - j), MPI_COMM_WORLD, &status);
+                    MPI_Recv(&matriz_original[j][start_j], g, MPI_INT, i, (start_i - j), MPI_COMM_WORLD, &status);
                 } // Fin del bucle j
             } // Fin del bucle i
         } // Fin del bucle principal k
@@ -204,15 +187,15 @@ int main(int argc, char **argv) {
         printf("\n\n");
 
         // Libera la memoria de la matriz original
-        freeMatrix(originalArray_W0, rows);
+        freeMatrix(matriz_original, rows);
 
     }     // Fin del código del proceso maestro
 
     MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);//Envio filas a los esclavos
 
     if  (rank != 0 ) { // Proceso Esclavo
-        int size_of_grid_chunk = rows / (sqrt((int)size)); // g = n / sqrt(p)
-        int g = size_of_grid_chunk;
+        int tamanio_submatriz = rows / (sqrt((int)size)); // g = n / sqrt(p)
+        int g = tamanio_submatriz;
 
         // Recibiendo el fragmento del grid del maestro
         int original_chunk[g][g];

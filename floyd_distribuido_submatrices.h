@@ -8,7 +8,7 @@
 // Declaraciones de funciones
 int min(int a, int b);
 int add(int a, int b);
-void readMatrixFromFile(const char* filename, int* rows, int*** matrix);
+int** readMatrixFromFile(const char* filename, int* rows);
 int** allocMatrix(int rows);
 void freeMatrix(int** matrix, int rows);
 int readVerticesCount(FILE* file);
