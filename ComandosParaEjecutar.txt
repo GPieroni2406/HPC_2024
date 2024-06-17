@@ -8,5 +8,5 @@ gcc -fopenmp -o floyd_paralelo floyd_paralelo.c
 
 DISTRIBUIDO
 
-mpicc -fopenmp -o floyd_distribuido floyd_distribuido.c
+mpicc -fopenmp -o floyd_distribuido floyd_distribuido_submatrices.c
 mpirun -np N ./floyd_distribuido numHilos
