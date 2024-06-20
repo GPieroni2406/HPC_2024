@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <mpi.h>
+#include <string.h>
 #include <limits.h>
 #include <math.h>
 #include <omp.h>
@@ -104,11 +105,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < rows; ++i) {
         MPI_Bcast(matriz_original[i], rows, MPI_INT, 0, MPI_COMM_WORLD);
     }
-    if (rank == 0){
-        printf("cantidad de nodos enviadas a los esclavos\n");
-    }
 
-        // Comprueba si 'rows' es divisible por la raíz cuadrada de 'size'
+    // Comprueba si 'rows' es divisible por la raíz cuadrada de 'size'
     int sqrt_size_ = (int)sqrt((double)size);
     if (rows % sqrt_size_ != 0) {
         if (rank == 0){
@@ -116,131 +114,93 @@ int main(int argc, char **argv) {
         }
         MPI_Abort(MPI_COMM_WORLD, 1); // Termina todos los procesos con un código de error.
     }
+    int i = 0;
+    int j = 0;
+    int k = 0;
+    int tamanio_submatriz = rows / (sqrt((int)size)); // g = n / sqrt(p)
+    int g = tamanio_submatriz; // g es el tamaño del fragmento tipo grid
+    int matriz_actualizada[g][g];
 
-    if (rank==0){
-        int tamanio_submatriz = rows / (sqrt((int)size)); // g = n / sqrt(p)
-        int i = 0;
-        int j = 0;
-        int k = 0;
-        int g = tamanio_submatriz; // g es el tamaño del fragmento tipo grid
-        // Cada proceso calcula el inicio de su submatriz
-        int row_start = (rank / (rows/g)) * g;
-        int col_start = (rank % (rows/g)) * g;
+    int row_start = (rank / (rows/g)) * g;
+    int col_start = (rank % (rows/g)) * g;
 
-        // Extraer la submatriz correspondiente
-        int matriz_actualizada[g][g];
-        for (int i = 0; i < g; i++) {
-            for (int j = 0; j < g; j++) {
-                matriz_actualizada[i][j] = matriz_original[row_start + i][col_start + j];
-            }
+    // Extraer la submatriz correspondiente
+    for (int i = 0; i < g; i++) {
+        for (int j = 0; j < g; j++) {
+            matriz_actualizada[i][j] = matriz_original[row_start + i][col_start + j];
         }
-            //IMPRIMO LA MATRIZ QUE RECIBO
-        printf("Proceso %d recibió la siguiente submatriz:\n", rank);
-        for (i = 0; i < g; i++) {
-            for (j = 0; j < g; j++) {
-                printf("%d ", matriz_actualizada[i][j]);
-            }
-            printf("\n");
+    }
+        //IMPRIMO LA MATRIZ QUE RECIBO
+    printf("\nProceso %d recibió la siguiente submatriz:\n", rank);
+    for (int i = 0; i < g; i++) {
+        for (int j = 0; j < g; j++) {
+            printf("%d ", matriz_actualizada[i][j]);
         }
+        printf("\n");
+    }
+    for (int k = 0; k < rows; k++) {
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == 0){
+                // Bucle principal en el maestro que se ejecuta k veces donde k es el número de vértices en el grafo
+                int i_filas_act[g][rows];
+                // Enviando las filas i o copiando directamente si i=0 (proceso maestro)
+                for (int i = 0; i < size; i++) {
+                    int i_by_g = i / g;
+                    if (i == 0) {
+                        // El proceso maestro copia sus filas directamente
+                        for (int j = i_by_g * g; j < (i_by_g * g) + g; j++) {
+                            memcpy(i_filas_act[j - (i_by_g * g)], &matriz_original[j][0], sizeof(int) * rows);
+                        }
+                    } else {
+                        // Enviar filas a los otros procesos
+                        for (j = i_by_g * g; j < (i_by_g * g) + g; j++) {
+                            MPI_Send(&matriz_original[j][0], rows, MPI_INT, i, (j - (i_by_g * g)), MPI_COMM_WORLD);
+                        }
+                    }
+                } // Fin del bucle i
 
-        // Fin del proceso de dividir la gran matriz en fragmentos tipo grid
-
-        // Bucle principal en el maestro que se ejecuta k veces donde k es el número de vértices en el grafo
-        for (k = 0; k < rows; k++) {
-            // Enviando las filas i
-            for (i = 0; i < size; i++) {
-                int i_by_g = i / g;
-                for (j = i_by_g * g; j < (i_by_g * g) + g; j++) {
-                    MPI_Send(&matriz_original[j][0], rows, MPI_INT, i, (j - (i_by_g * g)), MPI_COMM_WORLD); // Esto se ejecutará g veces para cada proceso
-                } // Fin del bucle j
-            } // Fin del bucle i
-
-            // Recibiendo las filas i
-            int i_filas_act[g][rows];
-            for (i = 0; i < g; i++) {
-                MPI_Status status;
-                MPI_Recv(&i_filas_act[i][0], rows, MPI_INT, 0, i, MPI_COMM_WORLD, &status);
-            }
-
-            // Enviando la fila k
-            for (i = 0; i < size; i++) {
-                MPI_Send(&matriz_original[k][0], rows, MPI_INT, i, k, MPI_COMM_WORLD); // la etiqueta es k
-            }
-            // Recibiendo la fila k
-            int k_row[rows];
-            MPI_Status status1;
-            MPI_Recv(&k_row, rows, MPI_INT, 0, k, MPI_COMM_WORLD, &status1);
-
-            omp_set_num_threads(numHilos); // Configura el número de hilos para OpenMP
-
-            #pragma omp parallel // Inicia un bloque paralelo
-            {
-                // Obtiene el ID del hilo dentro del bloque paralelo
-                int id = omp_get_thread_num();
-
-                // Realiza la actualización en paralelo
-                for (int j = 0; j < g; j++) {
-                    //int absolute_i = (((int)rank / g) * g) + id;
-                    int pos_j = ((rank % g) * g) + j;
-                    
-                    // Asegúrate de que el acceso a matriz_actualizada, i_filas_act y k_row es correcto
-                    matriz_actualizada[id][j] = calcular_minimo(matriz_actualizada[id][j], suma(i_filas_act[id][k], k_row[pos_j]));
+                // Enviando la fila k a todos los procesos excepto al maestro y copiando directamente en el maestro
+                int k_row[rows];
+                for (i = 0; i < size; i++) {
+                    if (i == 0) {
+                        // El proceso maestro copia la fila k directamente
+                        memcpy(k_row, &matriz_original[k][0], sizeof(int) * rows);
+                    } else {
+                        // Enviar la fila k a los otros procesos
+                        MPI_Send(&matriz_original[k][0], rows, MPI_INT, i, k, MPI_COMM_WORLD);
+                    }
                 }
-            }
-            // Enviando los resultados al maestro para actualizar
-            for (i = 0; i < g; i++) {
-                MPI_Send(&matriz_actualizada[i][0], g, MPI_INT, 0, i, MPI_COMM_WORLD);
-            }
-            // Recibiendo de los procesos esclavos y actualizando la matriz original
-            for (i = 0; i < size; i++) { // i representa el proceso del que recibimos
-                int start_i = (i / g) * g; // Cálculo de la fila inicial
-                int start_j = (i % g) * g; // Cálculo de la columna inicial
-                for (j = 0; j < g; j++) { // Usamos j como índice relativo dentro de la submatriz
-                    MPI_Status status;
-                    // Recibimos la fila `j` dentro de la submatriz (etiqueta `j`)
-                    MPI_Recv(&matriz_original[start_i + j][start_j], g, MPI_INT, i, j, MPI_COMM_WORLD, &status);
-                } // Fin del bucle j
-            } // Fin del bucle i
-        } // Fin del bucle principal k
 
-        printf("\nDespués de la computación, los valores del grid en el proceso %d son - \n", rank);
+                omp_set_num_threads(numHilos); // Configura el número de hilos para OpenMP
 
-        for (i = 0; i < g; i++) {
-            for (j = 0; j < g; j++) {
-                printf(" %d ", matriz_actualizada[i][j]);
-            }
-            printf("\n");
+                #pragma omp parallel // Inicia un bloque paralelo
+                {
+                    // Obtiene el ID del hilo dentro del bloque paralelo
+                    int id = omp_get_thread_num();
+
+                    // Realiza la actualización en paralelo
+                    for (int j = 0; j < g; j++) {
+                        //int absolute_i = (((int)rank / g) * g) + id;
+                        int pos_j = ((rank % g) * g) + j;
+                        
+                        // Asegúrate de que el acceso a matriz_actualizada, i_filas_act y k_row es correcto
+                        matriz_actualizada[id][j] = calcular_minimo(matriz_actualizada[id][j], suma(i_filas_act[id][k], k_row[pos_j]));
+                        matriz_original[id][j] = matriz_actualizada[id][j];
+                    }
+                }
+                
+                // Recibiendo de los procesos esclavos y actualizando la matriz original
+                for (i = 1; i < size; i++) { // i representa el proceso del que recibimos
+                    int start_i = (i / g) * g; // Cálculo de la fila inicial
+                    int start_j = (i % g) * g; // Cálculo de la columna inicial
+                    for (j = 0; j < g; j++) { // Usamos j como índice relativo dentro de la submatriz
+                        MPI_Status status;
+                        // Recibimos la fila `j` dentro de la submatriz (etiqueta `j`)
+                        MPI_Recv(&matriz_original[start_i + j][start_j], g, MPI_INT, i, j, MPI_COMM_WORLD, &status);
+                    } // Fin del bucle j
+                } // Fin del bucle i
         }
-        printf("\n\n");
-
-    }     // Fin del código del proceso maestro
-
-    if  (rank != 0 ) { // Proceso Esclavo
-        int tamanio_submatriz = rows / (sqrt((int)size)); // g = n / sqrt(p)
-        int g = tamanio_submatriz;
-
-        // Cada proceso calcula el inicio de su submatriz
-        int row_start = (rank / (rows/g)) * g;
-        int col_start = (rank % (rows/g)) * g;
-
-        // Extraer la submatriz correspondiente
-        int matriz_actualizada[g][g];
-        for (int i = 0; i < g; i++) {
-            for (int j = 0; j < g; j++) {
-                matriz_actualizada[i][j] = matriz_original[row_start + i][col_start + j];
-            }
-        }
-            //IMPRIMO LA MATRIZ QUE RECIBO
-        printf("Proceso %d recibió la siguiente submatriz:\n", rank);
-        for (int i = 0; i < g; i++) {
-            for (int j = 0; j < g; j++) {
-                printf("%d ", matriz_actualizada[i][j]);
-            }
-            printf("\n");
-        }
-
-        // Bucle principal en esclavo que se ejecuta k veces donde k es el número de vértices en el grafo
-        for (int k = 0; k < rows; k++) {
+        if(rank != 0){
             // Recibiendo las filas i del maestro
             int i_filas_act[g][rows];
             for (int i = 0; i < g; i++) {
@@ -272,18 +232,17 @@ int main(int argc, char **argv) {
             for (int i = 0; i < g; i++) {
                 MPI_Send(&matriz_actualizada[i][0], g, MPI_INT, 0, i, MPI_COMM_WORLD);
             } // Fin del bucle i
-        } // Fin del bucle principal k
-
-        printf("\nDespués de la computación, los valores del grid en el proceso %d son - \n", rank);
-        for (int i = 0; i < g; i++) {
-            for (int j = 0; j < g; j++) {
-                printf(" %d ", matriz_actualizada[i][j]);
-            }
-            printf("\n");
         }
-        printf("\n\n");
-        
-    } // Fin del Proceso Esclavo
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    printf("\nDespués de la computación, los valores del grid en el proceso %d son - \n", rank);
+    for (int i = 0; i < g; i++) {
+        for (int j = 0; j < g; j++) {
+            printf(" %d ", matriz_actualizada[i][j]);
+        }
+        printf("\n");
+    }
+    printf("\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0){
         printf("Esta es la matriz luego del algoritmo!\n");
