@@ -6,7 +6,6 @@
 
 #define INF 9999 // Valor utilizado para representar la ausencia de conexión.
 #define TAMANO_BLOQUE 2 // Tamaño de bloque para la programación dinámica de OpenMP.
-//#define numHilos 4 // Número de hilos para OpenMP.
 
 // Función para crear una matriz de adyacencia contigua en memoria.
 int **crear_matriz_contigua(int cantidad_vertices) {
@@ -21,7 +20,7 @@ int **crear_matriz_contigua(int cantidad_vertices) {
 }
 
 // Función para llenar la matriz de adyacencia desde un archivo.
-int **llenar_matriz(int *cantidad_vertices) {
+int **readMatrixFromFile(int *cantidad_vertices) {
     const char *nombre_archivo = "input.txt";
     FILE *archivo = fopen(nombre_archivo, "r");
 
@@ -55,7 +54,6 @@ int **llenar_matriz(int *cantidad_vertices) {
 
 // Función para mostrar la matriz de adyacencia.
 void mostrar_matriz(int **distancias, int cantidad_vertices) {
-    printf("Matriz de distancias más cortas entre cada par de vértices:\n");
     for (int i = 0; i < cantidad_vertices; i++) {
         for (int j = 0; j < cantidad_vertices; j++) {
             if (distancias[i][j] == INF)
@@ -67,10 +65,23 @@ void mostrar_matriz(int **distancias, int cantidad_vertices) {
     }
 }
 
+// Función para mostrar la matriz de adyacencia.
+void mostrar_filas_proceso(int **distancias, int inicio, int fin,int cantidad_vertices) {
+    for (int i = inicio; i < fin ; i++) {
+        for (int j = 0; j < cantidad_vertices; j++) {
+            if (distancias[i][j] == INF)
+                printf("%s\t", "INF");
+            else
+                printf("%d\t", distancias[i][j]);
+        }
+        printf("\n");
+    }
+}
+
 // Función para liberar los recursos de la matriz de adyacencia.
-void liberar_recursos(int **distancias, int cantidad_vertices) {
-    free(distancias[0]); // Libera el bloque de datos contiguos
-    free(distancias);    // Libera el arreglo de punteros
+void liberar_recursos(int **distancias) {
+    free(distancias[0]); // Libera la memoria contigua de los datos de la matriz.
+    free(distancias);    // Libera la memoria de los punteros a las filas.
 }
 
 // Función para abortar la ejecución con un mensaje de error.
@@ -85,16 +96,24 @@ void abortar_con_error(int codigo_error) {
     abort();
 }
 
+int calcular_minimo(int a, int b) {
+    if (a < b) return a;
+    else return b;
+}
+
+
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
-
     int rango, num_procesos, cantidad_vertices;
     MPI_Comm_rank(MPI_COMM_WORLD, &rango);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procesos);
 
+    printf("Comenzando, proceso numero %d\n", rango);
+
      // Verifica que se haya proporcionado un argumento para el número de hilos.
     if (argc != 2) {
         if (rango == 0) { // Solo el proceso raíz debe imprimir el mensaje de error.
+            printf("Ingrese el numero de hilos\n");
             fprintf(stderr, "Uso: %s <numero_de_hilos>\n", argv[0]);
         }
         MPI_Abort(MPI_COMM_WORLD, 1); // Finaliza todos los procesos.
@@ -119,42 +138,70 @@ int main(int argc, char **argv) {
     double tiempo_inicio, tiempo_final;
 
     if (rango == 0) {
-        distancias = llenar_matriz(&cantidad_vertices);
+        distancias = readMatrixFromFile(&cantidad_vertices);
+        printf("Esta es la matriz inicial\n");
         mostrar_matriz(distancias, cantidad_vertices);
+        printf("\n");
         tiempo_inicio = MPI_Wtime();
     }
-    
-    MPI_Bcast(*distancias, cantidad_vertices * cantidad_vertices, MPI_INT, 0, MPI_COMM_WORLD);
+    // Todos los procesos deben conocer la cantidad de vértices antes de recibir la matriz de distancias
+    MPI_Bcast(&cantidad_vertices, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+    //Inicializo la matriz en los escalvos.
+    if(rango!=0){
+            distancias = crear_matriz_contigua(cantidad_vertices);
+    }
+    // Transmitir la matriz completa, fila por fila, desde el proceso maestro a todos los esclavos.
+    MPI_Bcast(distancias[0], cantidad_vertices * cantidad_vertices, MPI_INT, 0, MPI_COMM_WORLD);
+
+
+    //paso: Es el número de filas de la matriz que cada proceso va a computar.
     int paso = cantidad_vertices / num_procesos;
+    
+    //Primer Fila del proceso.
     int inicio = rango * paso;
+    
+    //Ultima fila del proceso.
     int fin = inicio + paso;
+
     if (rango == num_procesos - 1) {
         fin = cantidad_vertices;
     }
+    MPI_Barrier(MPI_COMM_WORLD);
+    printf("Estas son las filas de las cuales se encarga el proceso %d:\n",rango);
+    for(int fila = inicio; fila<fin;fila++){
+        printf("%d",fila);
+    }
+    printf("\n");
+    //mostrar_filas_proceso(distancias,inicio,fin,cantidad_vertices);
+
+    // Espero que todos impriman sus filas.
+    MPI_Barrier(MPI_COMM_WORLD);
 
     omp_set_num_threads(numHilos);
     for (int k = 0; k < cantidad_vertices; k++) {
-        #pragma omp parallel for schedule(static, cantidad_vertices/numHilos) collapse(2)
+        #pragma omp parallel for schedule(static) collapse(2)
         for (int i = inicio; i < fin; i++) {
             for (int j = 0; j < cantidad_vertices; j++) {
                 if (distancias[i][k] == INF || distancias[k][j] == INF) continue;
-                int nueva_distancia = distancias[i][k] + distancias[k][j];
-                if (nueva_distancia < distancias[i][j]) {
-                    distancias[i][j] = nueva_distancia;
-                }
+                distancias[i][j] = calcular_minimo(distancias[i][j],distancias[i][k] + distancias[k][j]);
             }
         }
+        //después de cada iteración de k, se utiliza MPI_Allreduce con la operación MPI_MIN para combinar las matrices 
+        //de distancia de todos los procesos. MPI_IN_PLACE indica que la entrada y la salida de la operación de reducción están en el mismo lugar,
+        //es decir, la matriz de distancias se actualiza in situ. Esto sincroniza
+        //la matriz de distancias entre todos los procesos, asegurándose de que todos tienen la versión más reciente antes de la siguiente iteración de k
+
         MPI_Allreduce(MPI_IN_PLACE, *distancias, cantidad_vertices * cantidad_vertices, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
     }
 
     if (rango == 0) {
         tiempo_final = MPI_Wtime();
+        printf("Esta es la matriz de distancias más cortas entre cada par de vértices:\n");
         mostrar_matriz(distancias, cantidad_vertices);
         printf("Tiempo transcurrido: %.6f segundos.\n", tiempo_final - tiempo_inicio);
     }
-
-    liberar_recursos(distancias, cantidad_vertices);
+    liberar_recursos(distancias);
     MPI_Finalize();
     return 0;
 }

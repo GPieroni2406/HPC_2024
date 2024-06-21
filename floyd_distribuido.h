@@ -18,8 +18,10 @@
 
 // Prototipos de funciones para la creación, llenado y liberación de la matriz de adyacencia.
 int **crear_matriz_contigua(int num_nodos);
-int **llenar_matriz(int *num_nodos);
-void mostrar_matriz(int **distancias, int num_nodos);
-void liberar_recursos(int **distancias, int num_nodos);
+int **readMatrixFromFile(int *num_nodos);
+void mostrar_matriz(int **distancias, int cantidad_vertices);
+void mostrar_filas_proceso(int **distancias, int inicio, int fin,int cantidad_vertices);
+void liberar_recursos(int **distancias);
 void abortar_con_error(int codigo_error);
+int calcular_minimo(int a, int b);
 #endif
