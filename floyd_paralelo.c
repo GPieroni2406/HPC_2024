@@ -54,7 +54,7 @@ void algoritmoFloydWarshallParalelo(int **grafo, int cantidadVertices, int numHi
     free(matrizDistancias);
 }
 
-// Función para imprimir la matriz de distancias más cortas entre cada par de vértices.
+// Función para imprimir la matriz de distancias más cortas entre cada par de vértices..
 void mostrarMatrizDeDistancias(int **matrizDistancias, int cantidadVertices, int numHilos) {
     printf("La siguiente matriz muestra las distancias más cortas entre cada par de vértices\n");
     for (int i = 0; i < cantidadVertices; i++) {
