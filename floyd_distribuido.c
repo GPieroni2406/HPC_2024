@@ -168,37 +168,60 @@ int main(int argc, char **argv) {
         fin = cantidad_vertices;
     }
     MPI_Barrier(MPI_COMM_WORLD);
-    printf("Estas son las filas de las cuales se encarga el proceso %d:\n",rango);
-    for(int fila = inicio; fila<fin;fila++){
-        printf("%d",fila);
+
+    // Buffer para la fila k actualizada que se transmitirá
+    int *fila_k = (int *)malloc(cantidad_vertices * sizeof(int));
+    // El proceso raíz (rango 0) prepara un búfer para recibir toda la matriz de distancias
+    int *matriz_completa = NULL;
+    if (rango == 0) {
+        matriz_completa = (int *)malloc(cantidad_vertices * cantidad_vertices * sizeof(int));
     }
-    printf("\n");
-    //mostrar_filas_proceso(distancias,inicio,fin,cantidad_vertices);
-
-    // Espero que todos impriman sus filas.
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    omp_set_num_threads(numHilos);
+    
+    //omp_set_num_threads(numHilos);
     for (int k = 0; k < cantidad_vertices; k++) {
-        #pragma omp parallel for schedule(static) collapse(2)
+        //La fila k la debe enviar el responsable
+        int responsable=-1;
+        if (k>=inicio && k<fin){
+            responsable = rango;
+        }
+        // Garantiza que todos los procesos tengan el mismo valor de 'responsable'.
+        MPI_Allreduce(MPI_IN_PLACE, &responsable, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+        if (rango == responsable) {
+            memcpy(fila_k, distancias[k], cantidad_vertices * sizeof(int));
+        }
+        //Envio fila k a todos los procesos.
+        MPI_Bcast(fila_k, cantidad_vertices, MPI_INT, responsable, MPI_COMM_WORLD);
+
+        // Cada proceso actualiza su porción de la matriz
+        //#pragma omp parallel for schedule(static) collapse(2)
         for (int i = inicio; i < fin; i++) {
             for (int j = 0; j < cantidad_vertices; j++) {
-                if (distancias[i][k] == INF || distancias[k][j] == INF) continue;
-                distancias[i][j] = calcular_minimo(distancias[i][j],distancias[i][k] + distancias[k][j]);
+                if (distancias[i][k] == INF || fila_k[j] == INF) continue;
+                distancias[i][j] = calcular_minimo(distancias[i][j], distancias[i][k] + fila_k[j]);
             }
         }
-        //después de cada iteración de k, se utiliza MPI_Allreduce con la operación MPI_MIN para combinar las matrices 
-        //de distancia de todos los procesos. MPI_IN_PLACE indica que la entrada y la salida de la operación de reducción están en el mismo lugar,
-        //es decir, la matriz de distancias se actualiza in situ. Esto sincroniza
-        //la matriz de distancias entre todos los procesos, asegurándose de que todos tienen la versión más reciente antes de la siguiente iteración de k
-
-        MPI_Allreduce(MPI_IN_PLACE, *distancias, cantidad_vertices * cantidad_vertices, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
     }
+
+    // Recolectar las porciones de la matriz de cada proceso en el proceso raíz
+    MPI_Gather(distancias[inicio], paso * cantidad_vertices, MPI_INT, matriz_completa, paso * cantidad_vertices, MPI_INT, 0, MPI_COMM_WORLD);
+
+    free(fila_k); // Se libera la memoria del buffer
 
     if (rango == 0) {
         tiempo_final = MPI_Wtime();
-        printf("Esta es la matriz de distancias más cortas entre cada par de vértices:\n");
-        mostrar_matriz(distancias, cantidad_vertices);
+        printf("Matriz de distancias más cortas entre cada par de vértices:\n");
+        for (int i = 0; i < cantidad_vertices; i++) {
+            for (int j = 0; j < cantidad_vertices; j++) {
+                int valor = matriz_completa[i * cantidad_vertices + j];
+                if (valor == INF) {
+                    printf("INF\t");
+                } else {
+                    printf("%d\t", valor);
+                }
+            }
+            printf("\n");
+        }
+        free(matriz_completa);
         printf("Tiempo transcurrido: %.6f segundos.\n", tiempo_final - tiempo_inicio);
     }
     liberar_recursos(distancias);
