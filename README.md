@@ -13,6 +13,10 @@ python3 evaluar_hosts.py
 Como precondicion se debe tener python instalado.
 Como postcondicion se genera un archivo "hosts.txt" con equipos disponibles para ser usados como nodos en MPI
 
+## Matrices de Prueba
+
+Dentro de la carpeta "matrices" se agregaron archivos con diferentes matrices de prueba.
+
 ### Compilación del Programa
 
 Dentro de la carpeta principal se dejan los 3 codigos compilados.

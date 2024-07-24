@@ -11,8 +11,8 @@ module load mpi/mpich-x86_64
 python3 evaluar_hosts.py
 
 # Limpiar y compilar
-make clean
-make
+# make clean
+# make
 
 # Ejecutar el programa con mpirun
 mpirun -np $NP --hostfile hosts.txt ./floyd_distribuido $H $M
