@@ -29,7 +29,7 @@ def is_connectable(host):
         return False
 
 def main():
-    # Lista de strings con números entre 16 y 145
+    # Lista de strings con numeros entre 16 y 145
     strings = []
     inicio = 'pcunix'
 
