@@ -1,9 +1,18 @@
+#!/bin/bash
+
 NP=${1:-4} # PROCESOS - POR DEFECTO 4
 H=${2:-1} # HILOS - POR DEFECTO 1
+M=${matrices/16x16} # Archivo de matrices - POR DEFECTO 16 nodos
 
-# Se ejecuta mpirun con el valor de NP
+# Cargar el modulo MPI
 module load mpi/mpich-x86_64
+
+# Ejecutar el script Python
 python3 evaluar_hosts.py
+
+# Limpiar y compilar
 make clean
 make
-mpirun -np $NP --hostfile hosts.txt ./floyd_distribuido_submatrices $H
+
+# Ejecutar el programa con mpirun
+mpirun -np $NP --hostfile hosts.txt ./floyd_distribuido $H $M

@@ -1,0 +1,14 @@
+
+SERIAL
+- gcc -o floyd_secuencial floyd_secuencial.c
+- ./floyd_secuencial
+
+PARALELO
+- gcc -fopenmp -o floyd_paralelo floyd_paralelo.c
+- ./floyd_paralelo numHilos
+
+DISTRIBUIDO
+
+- Ejecutar iniciarEjecucion para obtener los hosts
+- mpicc -fopenmp -o floyd_distribuido floyd_distribuido.c -lm
+- mpirun -np N ./floyd_distribuido
