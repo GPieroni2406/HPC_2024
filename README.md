@@ -50,5 +50,5 @@ mpirun -np N ./floyd_distribuido
 Dentro de la carpeta principal, se deja un archivo llamado iniciarEjecucion.sh que fue utilizado en las maquinas de la FING. El mismo se encarga de obtener los Hosts disponibles y ejecutar el programa ditribuido con MPI.
 
 # ACLARACION
-1) Los archivos con la matriz 4000x4000 y 8000x8000 utilizadas como base de las pruebas fueron comprimidos para no ocupar tanto espacio. Estos pueden descomprimirse y utilizarse sin problema.
+1) Los archivos con la matriz 4096x4096 y 8000x8000 utilizadas como base de las pruebas fueron comprimidos para no ocupar tanto espacio. Estos pueden descomprimirse y utilizarse sin problema.
 2) Es coveniente realizar una re-compilacion del floyd_distribuido en la maquina donde se ejecute, ya que el mismo utiliza el modulo de mpi y trae problemas con la ubicacion.
