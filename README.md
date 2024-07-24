@@ -2,19 +2,16 @@
 
 El siguiente documento contiene las instrucciones para la compilación y ejecución del programa, así como archivos generados para compilar automáticamente.
 
-## Comandos de ejecución
+## Evaluar Hosts
 
-Se agregan los siguientes comandos de ejecución utilizados:
-
-### Evaluar Hosts
-
-El archivo de python evaluar_hosts.py sirve para...
+El archivo de python evaluar_hosts.py sirve para encontrar nodos disponibles en el cluster de la FING para una conexión futura por medio de SSH.
 Para ejecutarlo aplicamos el siguiente codigo:
 
 ```bash
 python3 evaluar_hosts.py
 ```
 Como precondicion se debe tener python instalado.
+Como postcondicion se genera un archivo "hosts.txt" con equipos disponibles para ser usados como nodos en MPI
 
 ### Compilación del Programa
 
@@ -39,10 +36,10 @@ Para realizar una ejecución del programa, se utilizan los siguientes comandos:
 
 ```bash
 Secuencial: 
-./floyd_secuencial
+./floyd_secuencial ubicacionMatriz
 
 Paralelo:
-./floyd_paralelo numHilos
+./floyd_paralelo numHilos ubicacionMatriz
 
 Distribuido:
 mpirun -np N ./floyd_distribuido
@@ -53,5 +50,5 @@ mpirun -np N ./floyd_distribuido
 Dentro de la carpeta principal, se deja un archivo llamado iniciarEjecucion.sh que fue utilizado en las maquinas de la FING. El mismo se encarga de obtener los Hosts disponibles y ejecutar el programa ditribuido con MPI.
 
 # ACLARACION
-1) El archivo con la matriz 8000x8000 utilizada como base de las pruebas fue comprimida para no ocupar tanto espacio. La misma puede descomprimirse y utilizarse sin problema.
+1) Los archivos con la matriz 4000x4000 y 8000x8000 utilizadas como base de las pruebas fueron comprimidos para no ocupar tanto espacio. Estos pueden descomprimirse y utilizarse sin problema.
 2) Es coveniente realizar una re-compilacion del floyd_distribuido en la maquina donde se ejecute, ya que el mismo utiliza el modulo de mpi y trae problemas con la ubicacion.
