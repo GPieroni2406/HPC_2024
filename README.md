@@ -46,13 +46,14 @@ Paralelo:
 ./floyd_paralelo numHilos ubicacionMatriz
 
 Distribuido:
-mpirun -np N ./floyd_distribuido
+mpirun -np N ./floyd_distribuido numHilos ubicacionMatriz
+*Se aclara que el parametro numHilos no presenta incidencia en el programa distribuido, ya que se habia realizado el modelo hibrido pero finalmente no va a ser tenido en cuenta*
 ```
 
-# Iniciar Ejecucion de Forma automatica
+# Iniciar ejecucion de Forma automatica (MPI)
 
-Dentro de la carpeta principal, se deja un archivo llamado iniciarEjecucion.sh que fue utilizado en las maquinas de la FING. El mismo se encarga de obtener los Hosts disponibles y ejecutar el programa ditribuido con MPI.
+Dentro de la carpeta principal, se deja un archivo llamado iniciar_ejecucion.sh que fue utilizado en las maquinas de la FING. El mismo se encarga de obtener los Hosts disponibles y ejecutar el programa ditribuido con MPI.
 
 # ACLARACION
 1) Los archivos con la matriz 4096x4096 y 8000x8000 utilizadas como base de las pruebas fueron comprimidos para no ocupar tanto espacio. Estos pueden descomprimirse y utilizarse sin problema.
-2) Es coveniente realizar una re-compilacion del floyd_distribuido en la maquina donde se ejecute, ya que el mismo utiliza el modulo de mpi y trae problemas con la ubicacion.
+2) Es coveniente realizar una re-compilacion del floyd_distribuido en la maquina donde se ejecute, ya que el mismo utiliza el modulo de mpi y trae problemas con la ubicacion del mismo.
